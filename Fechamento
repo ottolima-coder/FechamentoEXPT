@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Gerador de Mensagens</title>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f3f3f3; padding: 20px; }
+    .box { background: #fff; padding: 20px; border-radius: 8px; max-width: 800px; margin: auto; }
+    textarea { width: 100%; height: 140px; margin-top: 10px; }
+    button { margin-top: 5px; padding: 6px 12px; cursor: pointer; }
+    .msg { border: 1px solid #ddd; padding: 10px; margin-top: 15px; border-radius: 6px; background: #fafafa; }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h2>Gerador de Mensagens</h2>
+    <p>Lembrando que a primeira coluna do arquivo deve ser "Motorista" e a segunda "Sum of Total"<p>
+    <label>Início da semana:</label><br>
+    <input type="date" id="inicioSemana" /><br><br>
+    <label>Fim da semana:</label><br>
+    <input type="date" id="fimSemana" /><br><br>
+    <input type="file" id="fileInput" accept=".csv,.xlsx" />
+    <div id="output"></div>
+  </div>
+
+  <script>
+    document.getElementById('fileInput').addEventListener('change', handleFile);
+
+    function handleFile(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(sheet);
+
+        const inicio = document.getElementById('inicioSemana').value;
+        const fim = document.getElementById('fimSemana').value;
+
+        if (!inicio || !fim) {
+          alert('Por favor, preencha o início e o fim da semana.');
+          return;
+        }
+
+        const output = document.getElementById('output');
+        output.innerHTML = '';
+
+        rows.forEach(row => {
+          const msg = `Boa tarde! ${row.Motorista} 👋\n\nR$${row['Sum of Total']}\n\nSeguem os valores referentes à semana de ${formatarData(inicio)} a ${formatarData(fim)} 📅\nPoderia, por gentileza, conferir e confirmar se estão corretos? ✅\nLembrando que o prazo máximo para confirmação é até às 13h de segunda-feira ⏰`;
+
+          const div = document.createElement('div');
+          div.className = 'msg';
+
+          const textarea = document.createElement('textarea');
+          textarea.value = msg;
+
+          const btn = document.createElement('button');
+          btn.textContent = 'Copiar mensagem';
+          btn.onclick = () => navigator.clipboard.writeText(msg);
+
+          div.appendChild(textarea);
+          div.appendChild(btn);
+          output.appendChild(div);
+        });
+      };
+      function formatarData(data) {
+      const [ano, mes, dia] = data.split('-');
+      return `${dia}/${mes}/${ano}`;
+    }
+
+    reader.readAsArrayBuffer(file);
+    }
+  </script>
+</body>
+</html>
