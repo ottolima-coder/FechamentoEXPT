@@ -5,17 +5,107 @@
   <title>Gerador de Mensagens</title>
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <style>
-    body { font-family: Arial, sans-serif; background: #f3f3f3; padding: 20px; }
-    .box { background: #fff; padding: 20px; border-radius: 8px; max-width: 800px; margin: auto; }
-    textarea { width: 100%; height: 140px; margin-top: 10px; }
-    button { margin-top: 5px; padding: 6px 12px; cursor: pointer; }
-    .msg { border: 1px solid #ddd; padding: 10px; margin-top: 15px; border-radius: 6px; background: #fafafa; }
+    * { box-sizing: border-box; }
+    body {
+      font-family: Arial, sans-serif;
+      background: #0d1117;
+      color: #e6edf3;
+      padding: 20px;
+      margin: 0;
+    }
+    .box {
+      background: #161b22;
+      padding: 30px;
+      border-radius: 12px;
+      max-width: 800px;
+      margin: 30px auto;
+      box-shadow: 0 0 20px rgba(0,0,0,.4);
+      border: 1px solid #30363d;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+    .header .icons {
+      font-size: 40px;
+      line-height: 1;
+    }
+    h2 {
+      margin: 0;
+      color: #58a6ff;
+    }
+    p {
+      color: #9198a1;
+    }
+    label {
+      color: #c9d1d9;
+      font-weight: bold;
+    }
+    input[type="date"], input[type="file"] {
+      background: #0d1117;
+      color: #e6edf3;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 6px 10px;
+      margin-top: 4px;
+    }
+    textarea {
+      width: 100%;
+      height: 140px;
+      margin-top: 10px;
+      background: #0d1117;
+      color: #e6edf3;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 10px;
+      resize: vertical;
+    }
+    button {
+      margin-top: 8px;
+      margin-right: 8px;
+      padding: 8px 16px;
+      cursor: pointer;
+      background: #238636;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+    button:hover {
+      background: #2ea043;
+    }
+    .btn-wpp {
+      background: #25D366;
+      color: #0d1117;
+      font-weight: bold;
+    }
+    .btn-wpp:hover {
+      background: #2eeb7a;
+    }
+    .sem-telefone {
+      color: #f85149;
+      font-size: 13px;
+      margin-top: 6px;
+      display: inline-block;
+    }
+    .msg {
+      border: 1px solid #30363d;
+      padding: 15px;
+      margin-top: 15px;
+      border-radius: 8px;
+      background: #0d1117;
+    }
   </style>
 </head>
 <body>
   <div class="box">
-    <h2>Gerador de Mensagens</h2>
-    <p>Lembrando que a primeira coluna do arquivo deve ser "Motorista" e a segunda "Sum of Total"<p>
+    <div class="header">
+      <span class="icons">🗼🚚</span>
+      <h2>Gerador de Mensagens</h2>
+    </div>
+    <p>Lembrando que a primeira coluna do arquivo deve ser "Motorista" e a segunda "Sum of Total". Se tiver uma coluna "Telefone" (com DDI+DDD+número, ex: 5511987654321), o botão de enviar no WhatsApp aparece automaticamente.</p>
     <label>Início da semana:</label><br>
     <input type="date" id="inicioSemana" /><br><br>
     <label>Fim da semana:</label><br>
@@ -64,6 +154,26 @@
 
           div.appendChild(textarea);
           div.appendChild(btn);
+
+          const telefoneRaw = row.Telefone || row.telefone || row.WhatsApp || row.whatsapp;
+
+          if (telefoneRaw) {
+            const telefone = String(telefoneRaw).replace(/\D/g, '');
+            const btnWpp = document.createElement('button');
+            btnWpp.className = 'btn-wpp';
+            btnWpp.textContent = '📲 Enviar no WhatsApp';
+            btnWpp.onclick = () => {
+              const link = `https://wa.me/${telefone}?text=${encodeURIComponent(msg)}`;
+              window.open(link, '_blank');
+            };
+            div.appendChild(btnWpp);
+          } else {
+            const aviso = document.createElement('span');
+            aviso.className = 'sem-telefone';
+            aviso.textContent = ' ⚠️ Sem telefone na planilha para este motorista';
+            div.appendChild(aviso);
+          }
+
           output.appendChild(div);
         });
       };
