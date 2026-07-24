@@ -135,7 +135,7 @@
 
     <br>
     <button id="btnEnviarTodos" class="btn-wpp-all">📲 Enviar WhatsApp para todos</button>
-    <span id="avisoLote" class="aviso-lote">Vai abrir uma nova aba com a lista de todos os motoristas. Clique em um por vez (abre sempre na mesma aba de WhatsApp, sem acumular) e use "voltar" na lista para ir ao próximo.</span>
+    <span id="avisoLote" class="aviso-lote">Vai abrir uma nova aba com um botão "Próximo". Clique nele para ir passando de motorista em motorista, sempre na mesma aba do WhatsApp (nunca acumula abas).</span>
 
     <div id="output"></div>
   </div>
@@ -232,14 +232,14 @@
     document.getElementById('btnEnviarTodos').addEventListener('click', abrirPaginaComTodosLinks);
 
     function abrirPaginaComTodosLinks() {
-      const linksHtml = mensagensComTelefone.map((item, index) => {
-        const link = `https://wa.me/${item.telefone}?text=${encodeURIComponent(item.getMsg())}`;
-        return `
-          <a href="${link}" onclick="abrirNaAbaFixa(event, '${link}')"
-             style="display:block; padding:14px 18px; margin-bottom:10px; background:#25D366; color:#0d1117; font-weight:bold; text-decoration:none; border-radius:8px; font-family:Arial, sans-serif;">
-            📲 Conversar com ${item.motorista} no WhatsApp
-          </a>`;
-      }).join('');
+      // Serializa a lista (telefone + mensagem já resolvida) para levar para a aba filha,
+      // que vai controlar o avanço com um único botão "Próximo".
+      const lista = mensagensComTelefone.map(item => ({
+        telefone: item.telefone,
+        msg: item.getMsg(),
+        motorista: item.motorista
+      }));
+      const listaJson = JSON.stringify(lista).replace(/</g, '\\u003c');
 
       const paginaHtml = `
         <!DOCTYPE html>
@@ -248,20 +248,65 @@
           <meta charset="UTF-8" />
           <title>Enviar mensagens no WhatsApp</title>
           <style>
-            body { font-family: Arial, sans-serif; background:#0d1117; color:#e6edf3; padding:30px; }
-            h2 { color:#58a6ff; }
+            body { font-family: Arial, sans-serif; background:#0d1117; color:#e6edf3; padding:30px; max-width:600px; margin:0 auto; }
+            h2 { color:#58a6ff; margin-bottom: 4px; }
             p { color:#9198a1; }
+            .progresso { font-size: 15px; color:#c9d1d9; margin-bottom: 18px; }
+            .atual { background:#161b22; border:1px solid #30363d; border-radius:10px; padding:20px; margin-bottom:20px; }
+            .atual .nome { font-size: 20px; font-weight:bold; color:#e6edf3; margin-bottom: 10px; }
+            .atual .msgprev { white-space: pre-wrap; color:#9198a1; font-size:13px; border-left:3px solid #30363d; padding-left:10px; margin-bottom:16px; }
+            button { padding: 14px 20px; font-size:16px; font-weight:bold; border:none; border-radius:8px; cursor:pointer; margin-right:10px; margin-bottom:10px; }
+            .btn-abrir { background:#25D366; color:#0d1117; }
+            .btn-abrir:hover { background:#2eeb7a; }
+            .btn-proximo { background:#238636; color:white; }
+            .btn-proximo:hover { background:#2ea043; }
+            .btn-proximo:disabled { opacity:.4; cursor:not-allowed; }
+            .fim { font-size:18px; color:#3fb950; font-weight:bold; }
           </style>
         </head>
         <body>
-          <h2>Clique em cada motorista para abrir a conversa no WhatsApp</h2>
-          <p>Todos abrem na MESMA aba do WhatsApp (nunca acumula abas). Envie a mensagem lá, volte para esta lista e clique no próximo.</p>
-          ${linksHtml}
+          <h2>Enviar mensagens no WhatsApp</h2>
+          <p>Clique em "Abrir no WhatsApp", mande a mensagem por lá, volte aqui e clique em "Próximo". Sempre a mesma aba do WhatsApp, sem acumular.</p>
+          <div class="progresso" id="progresso"></div>
+          <div id="area"></div>
+
           <script>
-            function abrirNaAbaFixa(ev, link) {
-              ev.preventDefault();
-              window.open(link, 'zapEnvios');
+            const lista = ${listaJson};
+            let indice = 0;
+            const NOME_ABA_ZAP = '${NOME_ABA_ZAP}';
+
+            function render() {
+              const progresso = document.getElementById('progresso');
+              const area = document.getElementById('area');
+
+              if (indice >= lista.length) {
+                progresso.textContent = 'Concluído: ' + lista.length + ' de ' + lista.length;
+                area.innerHTML = '<div class="fim">✅ Todos os motoristas foram enviados!</div>';
+                return;
+              }
+
+              const item = lista[indice];
+              progresso.textContent = 'Motorista ' + (indice + 1) + ' de ' + lista.length;
+
+              area.innerHTML =
+                '<div class="atual">' +
+                  '<div class="nome">' + item.motorista + '</div>' +
+                  '<div class="msgprev">' + item.msg.replace(/&/g,'&amp;').replace(/</g,'&lt;') + '</div>' +
+                  '<button class="btn-abrir" id="btnAbrir">📲 Abrir no WhatsApp</button>' +
+                  '<button class="btn-proximo" id="btnProximo">➡️ Próximo</button>' +
+                '</div>';
+
+              document.getElementById('btnAbrir').onclick = function () {
+                const link = 'https://wa.me/' + item.telefone + '?text=' + encodeURIComponent(item.msg);
+                window.open(link, NOME_ABA_ZAP);
+              };
+              document.getElementById('btnProximo').onclick = function () {
+                indice++;
+                render();
+              };
             }
+
+            render();
           <\/script>
         </body>
         </html>`;
