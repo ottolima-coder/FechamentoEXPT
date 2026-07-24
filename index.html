@@ -61,6 +61,7 @@
       border-radius: 6px;
       padding: 10px;
       resize: vertical;
+      font-family: Arial, sans-serif;
     }
     button {
       margin-top: 8px;
@@ -99,6 +100,20 @@
     .btn-wpp-all:hover {
       background: #2eeb7a;
     }
+    .btn-skip {
+      background: #30363d;
+      color: #e6edf3;
+    }
+    .btn-skip:hover {
+      background: #3d444d;
+    }
+    .btn-stop {
+      background: #da3633;
+      color: white;
+    }
+    .btn-stop:hover {
+      background: #f85149;
+    }
     .aviso-lote {
       color: #9198a1;
       font-size: 13px;
@@ -118,6 +133,56 @@
       border-radius: 8px;
       background: #0d1117;
     }
+
+    /* Painel de envio em massa */
+    #painelEnvio {
+      display: none;
+      margin-top: 20px;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      padding: 20px;
+    }
+    .progresso-info {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      font-size: 14px;
+      color: #9198a1;
+    }
+    .progresso-barra-fundo {
+      background: #30363d;
+      border-radius: 6px;
+      height: 8px;
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+    .progresso-barra {
+      background: #25D366;
+      height: 100%;
+      width: 0%;
+      transition: width 0.2s ease;
+    }
+    .motorista-atual {
+      font-size: 18px;
+      font-weight: bold;
+      color: #58a6ff;
+      margin-bottom: 10px;
+    }
+    .dica-teclado {
+      font-size: 12px;
+      color: #6e7681;
+      margin-top: 10px;
+    }
+    .resumo-final {
+      display: none;
+      margin-top: 15px;
+      padding: 15px;
+      background: #0d1117;
+      border: 1px solid #238636;
+      border-radius: 8px;
+    }
   </style>
 </head>
 <body>
@@ -126,7 +191,7 @@
       <span class="icons">🗼🚚</span>
       <h2>Gerador de Mensagens</h2>
     </div>
-    <p> Primeira coluna do arquivo deve ser "Motorista" e a segunda "Sum of Total" (TABELA DINAMICA). Se tiver uma coluna "Telefone" (com DDI+DDD+número, ex: 5511987654321), terá o envio automatico "Botão enviar WPP".</p>
+    <p> O arquivo deve ter uma coluna "Motorista" e uma coluna "Sum of Total" (TABELA DINAMICA). Se tiver uma coluna "Telefone" (com DDI+DDD+número, ex: 5511987654321), terá o envio automatico "Botão enviar WPP".</p>
     <label>Início da semana:</label><br>
     <input type="date" id="inicioSemana" /><br><br>
     <label>Fim da semana:</label><br>
@@ -134,8 +199,32 @@
     <input type="file" id="fileInput" accept=".csv,.xlsx" />
 
     <br>
-    <button id="btnEnviarTodos" class="btn-wpp-all">📲 Enviar WhatsApp para todos</button>
-    <span id="avisoLote" class="aviso-lote">Vai abrir uma nova aba com a lista de todos os motoristas. Clique em um por vez (abre na mesma aba, sem acumular) e use "voltar" no navegador para ir ao próximo.</span>
+    <button id="btnEnviarTodos" class="btn-wpp-all">🚀 Iniciar envio para todos</button>
+    <span id="avisoLote" class="aviso-lote">Abre um painel de envio nesta mesma página. Cada motorista abre numa única aba de WhatsApp reutilizada (nunca acumula abas) — você só precisa apertar "Enviar" lá e depois "Próximo" aqui.</span>
+
+    <!-- Painel de envio em massa -->
+    <div id="painelEnvio">
+      <div class="progresso-info">
+        <span id="progressoTexto">0 de 0</span>
+        <span id="progressoStats">Enviados: 0 · Pulados: 0</span>
+      </div>
+      <div class="progresso-barra-fundo">
+        <div class="progresso-barra" id="progressoBarra"></div>
+      </div>
+      <div class="motorista-atual" id="motoristaAtual"></div>
+      <textarea id="mensagemAtual"></textarea>
+      <br>
+      <button id="btnAbrirZap" class="btn-wpp">📲 Abrir no WhatsApp</button>
+      <button id="btnProximo">✅ Próximo (já enviei)</button>
+      <button id="btnPular" class="btn-skip">⏭ Pular este</button>
+      <button id="btnParar" class="btn-stop">⏹ Parar</button>
+      <div class="dica-teclado">Atalho: pressione <strong>Enter</strong> para ir ao próximo depois de enviar.</div>
+
+      <div class="resumo-final" id="resumoFinal">
+        <strong>Envio concluído! 🎉</strong>
+        <p id="resumoTexto"></p>
+      </div>
+    </div>
 
     <div id="output"></div>
   </div>
@@ -144,6 +233,8 @@
     document.getElementById('fileInput').addEventListener('change', handleFile);
 
     let mensagensComTelefone = [];
+    // Nome fixo de janela: reutilizada em toda chamada de window.open, então nunca acumula abas.
+    const NOME_ABA_ZAP = 'zapEnvios';
 
     function handleFile(event) {
       const file = event.target.files[0];
@@ -167,6 +258,7 @@
         const output = document.getElementById('output');
         output.innerHTML = '';
         mensagensComTelefone = [];
+        esconderPainel();
 
         rows.forEach(row => {
           const msg = `Boa tarde! ${row.Motorista} 👋\n\nR$${row['Sum of Total']}\n\nSeguem os valores referentes à semana de ${formatarData(inicio)} a ${formatarData(fim)} 📅\nPoderia, por gentileza, conferir e confirmar se estão corretos? ✅\nLembrando que o prazo máximo para confirmação é até às 13h de segunda-feira ⏰`;
@@ -179,7 +271,7 @@
 
           const btn = document.createElement('button');
           btn.textContent = 'Copiar mensagem';
-          btn.onclick = () => navigator.clipboard.writeText(msg);
+          btn.onclick = () => navigator.clipboard.writeText(textarea.value);
 
           div.appendChild(textarea);
           div.appendChild(btn);
@@ -195,7 +287,12 @@
             btnWpp.onclick = () => abrirWhatsApp(telefone, textarea.value);
             div.appendChild(btnWpp);
 
-            mensagensComTelefone.push({ telefone, getMsg: () => textarea.value, motorista: row.Motorista });
+            mensagensComTelefone.push({
+              telefone,
+              motorista: row.Motorista,
+              getMsg: () => textarea.value,
+              setMsg: (v) => { textarea.value = v; }
+            });
           } else {
             const aviso = document.createElement('span');
             aviso.className = 'sem-telefone';
@@ -211,7 +308,7 @@
         if (mensagensComTelefone.length > 0) {
           btnTodos.style.display = 'inline-block';
           avisoLote.style.display = 'inline-block';
-          btnTodos.textContent = `📲 Enviar WhatsApp para todos (${mensagensComTelefone.length})`;
+          btnTodos.textContent = `🚀 Iniciar envio para todos (${mensagensComTelefone.length})`;
         } else {
           btnTodos.style.display = 'none';
           avisoLote.style.display = 'none';
@@ -223,48 +320,112 @@
 
     function abrirWhatsApp(telefone, msg) {
       const link = `https://wa.me/${telefone}?text=${encodeURIComponent(msg)}`;
-      window.open(link, '_blank');
-    }
-
-    document.getElementById('btnEnviarTodos').addEventListener('click', abrirPaginaComTodosLinks);
-
-    function abrirPaginaComTodosLinks() {
-      const linksHtml = mensagensComTelefone.map(item => {
-        const link = `https://wa.me/${item.telefone}?text=${encodeURIComponent(item.getMsg())}`;
-        return `
-          <a href="${link}"
-             style="display:block; padding:14px 18px; margin-bottom:10px; background:#25D366; color:#0d1117; font-weight:bold; text-decoration:none; border-radius:8px; font-family:Arial, sans-serif;">
-            📲 Conversar com ${item.motorista} no WhatsApp
-          </a>`;
-      }).join('');
-
-      const paginaHtml = `
-        <!DOCTYPE html>
-        <html lang="pt-BR">
-        <head>
-          <meta charset="UTF-8" />
-          <title>Enviar mensagens no WhatsApp</title>
-          <style>
-            body { font-family: Arial, sans-serif; background:#0d1117; color:#e6edf3; padding:30px; }
-            h2 { color:#58a6ff; }
-            p { color:#9198a1; }
-          </style>
-        </head>
-        <body>
-          <h2>Clique em cada motorista para abrir a conversa no WhatsApp</h2>
-          <p>Abre nesta MESMA aba (não acumula abas). Depois de enviar, aperte "voltar" no navegador para retornar aqui e clicar no próximo.</p>
-          ${linksHtml}
-        </body>
-        </html>`;
-
-      const blob = new Blob([paginaHtml], { type: 'text/html' });
-      const url = URL.createObjectURL(blob);
-      window.open(url, '_blank');
+      window.open(link, NOME_ABA_ZAP);
     }
 
     function formatarData(data) {
       const [ano, mes, dia] = data.split('-');
       return `${dia}/${mes}/${ano}`;
+    }
+
+    // ===== Painel de envio em massa (única aba reutilizada) =====
+
+    let filaEnvio = [];
+    let indiceAtual = 0;
+    let totalEnviados = 0;
+    let totalPulados = 0;
+
+    const painel = document.getElementById('painelEnvio');
+    const progressoTexto = document.getElementById('progressoTexto');
+    const progressoStats = document.getElementById('progressoStats');
+    const progressoBarra = document.getElementById('progressoBarra');
+    const motoristaAtualEl = document.getElementById('motoristaAtual');
+    const mensagemAtualEl = document.getElementById('mensagemAtual');
+    const resumoFinal = document.getElementById('resumoFinal');
+    const resumoTexto = document.getElementById('resumoTexto');
+
+    document.getElementById('btnEnviarTodos').addEventListener('click', iniciarEnvioEmMassa);
+    document.getElementById('btnAbrirZap').addEventListener('click', abrirZapAtual);
+    document.getElementById('btnProximo').addEventListener('click', () => avancar(true));
+    document.getElementById('btnPular').addEventListener('click', () => avancar(false));
+    document.getElementById('btnParar').addEventListener('click', pararEnvio);
+
+    // Atalho de teclado: Enter avança para o próximo (só quando o painel está ativo e o foco não está na textarea de edição de outra mensagem)
+    document.addEventListener('keydown', (ev) => {
+      if (painel.style.display !== 'block') return;
+      if (ev.key === 'Enter' && document.activeElement !== mensagemAtualEl) {
+        ev.preventDefault();
+        avancar(true);
+      }
+    });
+
+    function iniciarEnvioEmMassa() {
+      if (mensagensComTelefone.length === 0) return;
+      filaEnvio = mensagensComTelefone.slice();
+      indiceAtual = 0;
+      totalEnviados = 0;
+      totalPulados = 0;
+      resumoFinal.style.display = 'none';
+      painel.style.display = 'block';
+      // Salva a mensagem editada no painel de volta para a lista individual também
+      mensagemAtualEl.oninput = () => {
+        filaEnvio[indiceAtual].setMsg(mensagemAtualEl.value);
+      };
+      atualizarPainel();
+      painel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function atualizarPainel() {
+      const total = filaEnvio.length;
+      if (indiceAtual >= total) {
+        finalizarEnvio();
+        return;
+      }
+      const item = filaEnvio[indiceAtual];
+      progressoTexto.textContent = `${indiceAtual + 1} de ${total}`;
+      progressoStats.textContent = `Enviados: ${totalEnviados} · Pulados: ${totalPulados}`;
+      progressoBarra.style.width = `${(indiceAtual / total) * 100}%`;
+      motoristaAtualEl.textContent = `👤 ${item.motorista}`;
+      mensagemAtualEl.value = item.getMsg();
+    }
+
+    function abrirZapAtual() {
+      const item = filaEnvio[indiceAtual];
+      if (!item) return;
+      const msg = mensagemAtualEl.value;
+      item.setMsg(msg);
+      const link = `https://wa.me/${item.telefone}?text=${encodeURIComponent(msg)}`;
+      window.open(link, NOME_ABA_ZAP);
+    }
+
+    function avancar(foiEnviado) {
+      if (indiceAtual >= filaEnvio.length) return;
+      if (foiEnviado) totalEnviados++; else totalPulados++;
+      indiceAtual++;
+      atualizarPainel();
+    }
+
+    function pararEnvio() {
+      painel.style.display = 'none';
+    }
+
+    function finalizarEnvio() {
+      progressoBarra.style.width = '100%';
+      progressoTexto.textContent = `${filaEnvio.length} de ${filaEnvio.length}`;
+      progressoStats.textContent = `Enviados: ${totalEnviados} · Pulados: ${totalPulados}`;
+      motoristaAtualEl.textContent = '';
+      mensagemAtualEl.value = '';
+      resumoFinal.style.display = 'block';
+      resumoTexto.textContent = `${totalEnviados} mensagens enviadas e ${totalPulados} puladas de ${filaEnvio.length} motoristas.`;
+    }
+
+    function esconderPainel() {
+      painel.style.display = 'none';
+      resumoFinal.style.display = 'none';
+      filaEnvio = [];
+      indiceAtual = 0;
+      totalEnviados = 0;
+      totalPulados = 0;
     }
   </script>
 </body>
