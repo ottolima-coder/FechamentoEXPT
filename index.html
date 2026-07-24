@@ -135,7 +135,7 @@
 
     <br>
     <button id="btnEnviarTodos" class="btn-wpp-all">📲 Enviar WhatsApp para todos</button>
-    <span id="avisoLote" class="aviso-lote">Vamos abrir uma aba do WhatsApp por motorista, com um pequeno intervalo entre cada uma. Se o navegador bloquear alguma aba, permita pop-ups para este site e clique novamente.</span>
+    <span id="avisoLote" class="aviso-lote">Vai abrir uma nova aba com a lista de todos os motoristas — clique em cada um ali para abrir a conversa no WhatsApp.</span>
 
     <div id="output"></div>
   </div>
@@ -226,24 +226,40 @@
       window.open(link, '_blank');
     }
 
-    document.getElementById('btnEnviarTodos').addEventListener('click', enviarParaTodos);
+    document.getElementById('btnEnviarTodos').addEventListener('click', abrirPaginaComTodosLinks);
 
-    function enviarParaTodos() {
-      const btnTodos = document.getElementById('btnEnviarTodos');
-      btnTodos.disabled = true;
-
-      mensagensComTelefone.forEach((item, index) => {
+    function abrirPaginaComTodosLinks() {
+      const linksHtml = mensagensComTelefone.map(item => {
         const link = `https://wa.me/${item.telefone}?text=${encodeURIComponent(item.getMsg())}`;
-        const a = document.createElement('a');
-        a.href = link;
-        a.target = '_blank';
-        a.rel = 'noopener';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-      });
+        return `
+          <a href="${link}" target="_blank" rel="noopener"
+             style="display:block; padding:14px 18px; margin-bottom:10px; background:#25D366; color:#0d1117; font-weight:bold; text-decoration:none; border-radius:8px; font-family:Arial, sans-serif;">
+            📲 Conversar com ${item.motorista} no WhatsApp
+          </a>`;
+      }).join('');
 
-      btnTodos.disabled = false;
+      const paginaHtml = `
+        <!DOCTYPE html>
+        <html lang="pt-BR">
+        <head>
+          <meta charset="UTF-8" />
+          <title>Enviar mensagens no WhatsApp</title>
+          <style>
+            body { font-family: Arial, sans-serif; background:#0d1117; color:#e6edf3; padding:30px; }
+            h2 { color:#58a6ff; }
+            p { color:#9198a1; }
+          </style>
+        </head>
+        <body>
+          <h2>Clique em cada motorista para abrir a conversa no WhatsApp</h2>
+          <p>Cada link abre em uma nova aba. Depois de conversar, volte aqui para clicar no próximo.</p>
+          ${linksHtml}
+        </body>
+        </html>`;
+
+      const blob = new Blob([paginaHtml], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
     }
 
     function formatarData(data) {
