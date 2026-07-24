@@ -76,6 +76,10 @@
     button:hover {
       background: #2ea043;
     }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
     .btn-wpp {
       background: #25D366;
       color: #0d1117;
@@ -83,6 +87,23 @@
     }
     .btn-wpp:hover {
       background: #2eeb7a;
+    }
+    .btn-wpp-all {
+      background: #25D366;
+      color: #0d1117;
+      font-weight: bold;
+      font-size: 16px;
+      padding: 12px 20px;
+      display: none;
+    }
+    .btn-wpp-all:hover {
+      background: #2eeb7a;
+    }
+    .aviso-lote {
+      color: #9198a1;
+      font-size: 13px;
+      margin-top: 6px;
+      display: none;
     }
     .sem-telefone {
       color: #f85149;
@@ -111,11 +132,18 @@
     <label>Fim da semana:</label><br>
     <input type="date" id="fimSemana" /><br><br>
     <input type="file" id="fileInput" accept=".csv,.xlsx" />
+
+    <br>
+    <button id="btnEnviarTodos" class="btn-wpp-all">📲 Enviar WhatsApp para todos</button>
+    <span id="avisoLote" class="aviso-lote">Vamos abrir uma aba do WhatsApp por motorista, com um pequeno intervalo entre cada uma. Se o navegador bloquear alguma aba, permita pop-ups para este site e clique novamente.</span>
+
     <div id="output"></div>
   </div>
 
   <script>
     document.getElementById('fileInput').addEventListener('change', handleFile);
+
+    let mensagensComTelefone = [];
 
     function handleFile(event) {
       const file = event.target.files[0];
@@ -138,6 +166,7 @@
 
         const output = document.getElementById('output');
         output.innerHTML = '';
+        mensagensComTelefone = [];
 
         rows.forEach(row => {
           const msg = `Boa tarde! ${row.Motorista} 👋\n\nR$${row['Sum of Total']}\n\nSeguem os valores referentes à semana de ${formatarData(inicio)} a ${formatarData(fim)} 📅\nPoderia, por gentileza, conferir e confirmar se estão corretos? ✅\nLembrando que o prazo máximo para confirmação é até às 13h de segunda-feira ⏰`;
@@ -159,14 +188,14 @@
 
           if (telefoneRaw) {
             const telefone = String(telefoneRaw).replace(/\D/g, '');
+
             const btnWpp = document.createElement('button');
             btnWpp.className = 'btn-wpp';
             btnWpp.textContent = '📲 Enviar no WhatsApp';
-            btnWpp.onclick = () => {
-              const link = `https://wa.me/${telefone}?text=${encodeURIComponent(msg)}`;
-              window.open(link, '_blank');
-            };
+            btnWpp.onclick = () => abrirWhatsApp(telefone, textarea.value);
             div.appendChild(btnWpp);
+
+            mensagensComTelefone.push({ telefone, getMsg: () => textarea.value, motorista: row.Motorista });
           } else {
             const aviso = document.createElement('span');
             aviso.className = 'sem-telefone';
@@ -176,13 +205,48 @@
 
           output.appendChild(div);
         });
+
+        const btnTodos = document.getElementById('btnEnviarTodos');
+        const avisoLote = document.getElementById('avisoLote');
+        if (mensagensComTelefone.length > 0) {
+          btnTodos.style.display = 'inline-block';
+          avisoLote.style.display = 'inline-block';
+          btnTodos.textContent = `📲 Enviar WhatsApp para todos (${mensagensComTelefone.length})`;
+        } else {
+          btnTodos.style.display = 'none';
+          avisoLote.style.display = 'none';
+        }
       };
-      function formatarData(data) {
-      const [ano, mes, dia] = data.split('-');
-      return `${dia}/${mes}/${ano}`;
+
+      reader.readAsArrayBuffer(file);
     }
 
-    reader.readAsArrayBuffer(file);
+    function abrirWhatsApp(telefone, msg) {
+      const link = `https://wa.me/${telefone}?text=${encodeURIComponent(msg)}`;
+      window.open(link, '_blank');
+    }
+
+    document.getElementById('btnEnviarTodos').addEventListener('click', enviarParaTodos);
+
+    function enviarParaTodos() {
+      const btnTodos = document.getElementById('btnEnviarTodos');
+      btnTodos.disabled = true;
+
+      const intervaloMs = 600; // espaçamento entre aberturas de aba, para evitar bloqueio de pop-up
+
+      mensagensComTelefone.forEach((item, index) => {
+        setTimeout(() => {
+          abrirWhatsApp(item.telefone, item.getMsg());
+          if (index === mensagensComTelefone.length - 1) {
+            btnTodos.disabled = false;
+          }
+        }, index * intervaloMs);
+      });
+    }
+
+    function formatarData(data) {
+      const [ano, mes, dia] = data.split('-');
+      return `${dia}/${mes}/${ano}`;
     }
   </script>
 </body>
