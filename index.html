@@ -232,16 +232,18 @@
       const btnTodos = document.getElementById('btnEnviarTodos');
       btnTodos.disabled = true;
 
-      const intervaloMs = 600; // espaçamento entre aberturas de aba, para evitar bloqueio de pop-up
-
       mensagensComTelefone.forEach((item, index) => {
-        setTimeout(() => {
-          abrirWhatsApp(item.telefone, item.getMsg());
-          if (index === mensagensComTelefone.length - 1) {
-            btnTodos.disabled = false;
-          }
-        }, index * intervaloMs);
+        const link = `https://wa.me/${item.telefone}?text=${encodeURIComponent(item.getMsg())}`;
+        const a = document.createElement('a');
+        a.href = link;
+        a.target = '_blank';
+        a.rel = 'noopener';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
       });
+
+      btnTodos.disabled = false;
     }
 
     function formatarData(data) {
